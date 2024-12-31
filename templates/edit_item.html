@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑菜品</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h1>✏️ 编辑菜品</h1>
+        <div>
+            <p>欢迎，{{ session['username'] }}！</p>
+            <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                <button class="btn btn-secondary">登出</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2>编辑菜品 #{{ item.id }}</h2>
+        <form method="POST" class="edit-item-form">
+            <label for="item_name">菜品名称:</label>
+            <input type="text" id="item_name" name="item_name" value="{{ item.item_name }}" required>
+
+            <label for="description">描述:</label>
+            <textarea id="description" name="description" required>{{ item.description }}</textarea>
+
+            <label for="price">价格:</label>
+            <input type="number" id="price" name="price" value="{{ item.price }}" required>
+
+            <button type="submit" class="btn btn-primary">更新菜品</button>
+        </form>
+    </main>
+
+    <footer>
+        <p>© 2024 菜品菜单系统. 美味每一天！</p>
+    </footer>
+</body>
+</html>

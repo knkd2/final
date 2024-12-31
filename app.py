@@ -907,24 +907,20 @@ conn = sqlite3.connect('new_delivery.db')  # 請將 'your_database_file.db' 替�
 cursor = conn.cursor()
 
 # 刪除現有的 merchant_orders 資料表（如果存在）
-cursor.execute("DROP TABLE IF EXISTS orders")
+cursor.execute("DROP TABLE IF EXISTS reviews")
 
 # 重新創建 merchant_orders 資料表
-cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    customer_id INTEGER NOT NULL,
-                    merchant_id INTEGER NOT NULL,
-                    delivery_person_id INTEGER,
-                    delivery_status TEXT  DEFAULT '待確認',
-                    item_id INTEGER NOT NULL,
-                    status TEXT NOT NULL,
-                    price REAL NOT NULL,
-                    item_name TEXT NOT NULL,
-                    acceptance_status TEXT DEFAULT '待確認',
-                    FOREIGN KEY (customer_id) REFERENCES users (id),
-                    FOREIGN KEY (merchant_id) REFERENCES users (id),
-                    FOREIGN KEY (delivery_person_id) REFERENCES users (id),
-                    FOREIGN KEY (item_id) REFERENCES menu (id))''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS reviews (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        reviewed_user_id INTEGER NOT NULL,
+                        order_id INTEGER NOT NULL,
+                        rating INTEGER NOT NULL,
+                        comment TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id),
+                        FOREIGN KEY (reviewed_user_id) REFERENCES users (id),
+                        FOREIGN KEY (order_id) REFERENCES orders (id))''')
 
 # 提交更改
 conn.commit()
@@ -932,8 +928,8 @@ conn.commit()
 # 關閉資料庫連接
 conn.close()
 
-print("merchant_orders 資料表已刪除並重新建立")"""
-
+print("merchant_orders 資料表已刪除並重新建立")
+"""
 
 
 if __name__ == '__main__':
