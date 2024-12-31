@@ -5,6 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的訂單</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        function calculateTotal() {
+            let total = 0;
+            const checkboxes = document.querySelectorAll('input[name="order_ids"]:checked:not(:disabled)');
+            checkboxes.forEach(checkbox => {
+                const orderItem = checkbox.closest('.order-item');
+                const orderPrice = orderItem.querySelector('.order-price');
+                total += parseFloat(orderPrice.dataset.price);
+            });
+            document.getElementById('total-price').textContent = `總金額: $${total.toFixed(2)}`;
+        }
+
+        function deleteOrder(orderId) {
+            fetch(`/delete_order/${orderId}`, {
+                method: 'POST',
+            }).then(response => {
+                if (response.ok) {
+                    document.getElementById(`order-${orderId}`).remove();  // 移除該訂單
+                    calculateTotal();  // 更新總金額
+                }
+            });
+        }
+    </script>
 </head>
 <body>
     <header class="navbar">
@@ -23,11 +46,13 @@
             <ul class="order-list">
                 {% if orders %}
                     {% for order in orders %}
-                        <li class="order-item">
-                            <input type="checkbox" name="order_ids" value="{{ order.id }}">
+                        <li id="order-{{ order.id }}" class="order-item">
+                            <input type="checkbox" name="order_ids" value="{{ order.id }}" 
+                                {% if order.status == '已確認' %} disabled {% endif %} 
+                                onclick="calculateTotal()">
                             <span>訂單 #{{ order.id }}:</span>
                             <span>{{ order.item_name }}</span> - 
-                            <span class="order-price">金額: {{ order.price }}</span> - 
+                            <span class="order-price" data-price="{{ order.price }}">金額: {{ order.price }}</span> - 
                             <span class="order-status">狀態: {{ order.status }}</span> - 
                             <span class="order-submitted">
                                 {% if order.status == '已確認' %}
@@ -36,17 +61,16 @@
                                     未下單
                                 {% endif %}
                             </span>
+
                             {% if order.status != '已確認' %}
-                                <form action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" class="inline-form">
-                                    <button type="submit" class="btn btn-danger">刪除</button>
-                                </form>
+                                <button type="button" class="btn btn-danger" onclick="deleteOrder({{ order.id }})">刪除</button>
                             {% endif %}
                         </li>
                     {% endfor %}
                     <li class="order-total">
-                        <strong>總金額: ${{ total_price }}</strong>
+                        <strong id="total-price">總金額: $0.00</strong>
                     </li>
-                    <button class="btn btn-primary" type="submit">确认下單</button>
+                    <button class="btn btn-primary" type="submit">確認下單</button>
                 {% else %}
                     <li class="empty-orders">您沒有任何訂單。</li>
                 {% endif %}

@@ -75,27 +75,21 @@ def init_db():
                     FOREIGN KEY (merchant_id) REFERENCES users (id),
                     FOREIGN KEY (delivery_person_id) REFERENCES users (id),
                     FOREIGN KEY (item_id) REFERENCES menu (id))''')
-
-
-    # 添加交易明細表
     conn.execute('''CREATE TABLE IF NOT EXISTS transactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    amount REAL NOT NULL,
-                    transaction_type TEXT NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users (id))''')
-
-    # 添加報告表
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER NOT NULL,
+                  amount REAL NOT NULL,
+                  transaction_type TEXT NOT NULL,
+                  FOREIGN KEY (user_id) REFERENCES users (id))''')
+     
+    # 創建報告表 
     conn.execute('''CREATE TABLE IF NOT EXISTS reports (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    total_received REAL,
-                    total_orders INTEGER,
-                    total_due REAL,
-                    report_type TEXT NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users (id))''')
-
-
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 user_id INTEGER NOT NULL, total_received REAL, 
+                total_orders INTEGER, total_due REAL,
+                 report_type TEXT NOT NULL,
+                 FOREIGN KEY (user_id) REFERENCES users (id))''')
+   
 
 
 
@@ -103,7 +97,8 @@ def init_db():
     users = [
         ('merchant', generate_password_hash('merchant123'), 'merchant'),
         ('customer', generate_password_hash('customer123'), 'customer'),
-        ('delivery', generate_password_hash('delivery123'), 'delivery_person')
+        ('delivery', generate_password_hash('delivery123'), 'delivery_person'),
+        ('settle', generate_password_hash('settle123'), 'settle')
     ]
 
     for user in users:
@@ -141,6 +136,8 @@ def login():
                 return redirect(url_for('index'))  # 顾客订单页面
             elif user['role'] == 'delivery_person':
                 return redirect(url_for('delivery_orders'))  # 配送员的管理页面
+            # 配送員管理頁面 
+            elif user['role'] == 'settle': return redirect(url_for('view_reports', report_type='settle')) # 結算管理頁面
         else:
             flash('用户名或密码错误，请重试。', 'error')
 
@@ -352,11 +349,12 @@ def orders():
         WHERE orders.customer_id = ?
     ''', (session['user_id'],)).fetchall()
 
-    # 計算總金額
-    total_price = sum(order['price'] for order in orders)
+    # 只計算未確認的訂單金額
+    total_price = sum(order['price'] for order in orders if order['status'] != '已確認')
 
     conn.close()
     return render_template('orders.html', orders=orders, total_price=total_price)
+
 
 
 
@@ -477,47 +475,56 @@ def delivery_orders():
 
     return render_template('delivery_orders.html', delivery_orders=orders)
 
-@app.route('/settle_accounts', methods=['POST'])
-def settle_accounts():
+@app.route('/settlements', methods=['POST', 'GET'])
+def settlements():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 計算商家應收金額
-    merchants = cursor.execute('''SELECT merchant_id, SUM(price) as total_received
-                                  FROM merchant_orders
-                                  WHERE status = "已完成"
-                                  GROUP BY merchant_id''').fetchall()
+    try:
+        # 計算商家應收金額
+        merchants = cursor.execute('''SELECT merchant_id, SUM(price) as total_received
+                                      FROM merchant_orders
+                                      WHERE status = "已完成"
+                                      GROUP BY merchant_id''').fetchall()
+        
+        for merchant in merchants:
+            cursor.execute('''INSERT INTO transactions (user_id, amount, transaction_type) 
+                              VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '應收'))
+            cursor.execute('''INSERT INTO reports (user_id, total_received, report_type) 
+                              VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '商家'))
+        
+        # 計算外送員接單數
+        delivery_persons = cursor.execute('''SELECT delivery_person_id, COUNT(*) as total_orders
+                                             FROM orders
+                                             WHERE delivery_person_id IS NOT NULL
+                                             GROUP BY delivery_person_id''').fetchall()
+        
+        for person in delivery_persons:
+            cursor.execute('''INSERT INTO reports (user_id, total_orders, report_type) 
+                              VALUES (?, ?, ?)''', (person['delivery_person_id'], person['total_orders'], '外送員'))
+        
+        # 計算客戶應付金額
+        customers = cursor.execute('''SELECT customer_id, SUM(price) as total_due
+                                      FROM orders
+                                      WHERE status = "已完成"
+                                      GROUP BY customer_id''').fetchall()
+        
+        for customer in customers:
+            cursor.execute('''INSERT INTO reports (user_id, total_due, report_type) 
+                              VALUES (?, ?, ?)''', (customer['customer_id'], customer['total_due'], '客戶'))
+        
+        conn.commit()
+        flash('結算完成', 'success')
     
-    for merchant in merchants:
-        cursor.execute('''INSERT INTO transactions (user_id, amount, transaction_type) 
-                          VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '應收'))
-        cursor.execute('''INSERT INTO reports (user_id, total_received, report_type) 
-                          VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '商家'))
+    except sqlite3.Error as e:
+        conn.rollback()
+        flash(f'結算失敗: {e}', 'error')
     
-    # 計算外送員接單數
-    delivery_persons = cursor.execute('''SELECT delivery_person_id, COUNT(*) as total_orders
-                                         FROM orders
-                                         WHERE delivery_person_id IS NOT NULL
-                                         GROUP BY delivery_person_id''').fetchall()
+    finally:
+        cursor.close()  # 確保游標在操作完成後關閉
+        conn.close()  # 確保連接在操作完成後關閉
     
-    for person in delivery_persons:
-        cursor.execute('''INSERT INTO reports (user_id, total_orders, report_type) 
-                          VALUES (?, ?, ?)''', (person['delivery_person_id'], person['total_orders'], '外送員'))
-    
-    # 計算客戶應付金額
-    customers = cursor.execute('''SELECT customer_id, SUM(price) as total_due
-                                  FROM orders
-                                  WHERE status = "已完成"
-                                  GROUP BY customer_id''').fetchall()
-    
-    for customer in customers:
-        cursor.execute('''INSERT INTO reports (user_id, total_due, report_type) 
-                          VALUES (?, ?, ?)''', (customer['customer_id'], customer['total_due'], '客戶'))
-    
-    conn.commit()
-    conn.close()
-    flash('結算完成', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('view_reports', report_type='settle'))
 
 @app.route('/reports/<string:report_type>', methods=['GET'])
 def view_reports(report_type):
@@ -550,7 +557,6 @@ def view_reports(report_type):
                            report_type=report_type)
 
 
-
 """import sqlite3  #刪除資料庫資料
 
 def clear_orders():
@@ -565,7 +571,8 @@ def clear_orders():
     print("已清空訂單表中的所有資料。")
 
 # 執行清空訂單表操作
-clear_orders()"""
+clear_orders()
+"""
 
 
 

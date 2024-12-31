@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>首页</title>
+    <title>首頁</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header class="navbar">
-        <h1>📦 菜品菜单</h1>
+        <h1>📦 菜品菜單</h1>
         <div>
             {% if session.get('user_id') %}
-                <p>欢迎，{{ session['username'] }}！</p>
+                <p>歡迎，{{ session['username'] }}！</p>
                 <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
                     <button class="btn btn-secondary">登出</button>
                 </form>
             {% else %}
-                <a href="{{ url_for('login') }}" class="btn btn-primary">登录</a>
+                <a href="{{ url_for('login') }}" class="btn btn-primary">登入</a>
             {% endif %}
         </div>
     </header>
@@ -30,7 +30,7 @@
                     <span>{{ item.price }} 元</span>
                     {% if session.get('user_id') and session['role'] == 'customer' %}
                         <form action="{{ url_for('place_order', item_id=item.id) }}" method="POST">
-                            <button class="btn btn-primary">下单</button>
+                            <button class="btn btn-primary">下單</button>
                         </form>
                     {% endif %}
                 </li>
@@ -39,7 +39,7 @@
     </main>
 
     <footer>
-        <p>© 2024 菜品菜单系统. 美味每一天！</p>
+        <p>© 2024 菜品菜單系统. 美味每一天！</p>
     </footer>
 </body>
 </html>
