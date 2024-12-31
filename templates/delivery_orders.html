@@ -10,7 +10,7 @@
     <header class="navbar">
         <h1>🚚 外送員頁面</h1>
         <div>
-            <p>欢迎，{{ session['username'] }}！</p>
+            <p>歡迎，{{ session['username'] }}！</p>
             <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
                 <button class="btn btn-secondary">登出</button>
             </form>
@@ -33,6 +33,18 @@
                             </form>
                         {% elif order.status == '已接單' %}
                             <span>已接單</span>
+                            <form action="{{ url_for('pickup_order', order_id=order.id) }}" method="POST" class="inline-form">
+                                <button class="btn btn-info">取貨</button>
+                            </form>
+                        {% elif order.status == '取貨中' %}
+                            <span>取貨中</span>
+                            <form action="{{ url_for('complete_delivery', order_id=order.id) }}" method="POST" class="inline-form">
+                                <button class="btn btn-success">送達簽收</button>
+                            </form>
+                        {% elif order.status == '已送達' %}
+                            <span>已送達</span>
+                        {% elif order.status == '已完成' %}
+                            <span>訂單已完成</span>
                         {% endif %}
                     </li>
                 {% endfor %}

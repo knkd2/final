@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,6 +15,27 @@
             document.getElementById('total-price').textContent = `總金額: $${total.toFixed(2)}`;
         }
 
+        function validateForm(orderId) {
+            var formValid = true;
+            var rating = document.getElementById('rating-' + orderId).value;
+            var comment = document.getElementById('comment-' + orderId).value;
+            var reviewedUserId = document.getElementById('reviewed_user_id-' + orderId).value;
+
+            if (!rating) {
+                alert("請輸入評分！");
+                formValid = false;
+            }
+            if (!comment) {
+                alert("請輸入評論！");
+                formValid = false;
+            }
+            if (!reviewedUserId) {
+                alert("請選擇評論對象！");
+                formValid = false;
+            }
+            return formValid;
+        }
+
         function showReviewModal(orderId) {
             document.getElementById(`review-modal-${orderId}`).style.display = 'block';
         }
@@ -23,45 +44,19 @@
             document.getElementById(`review-modal-${orderId}`).style.display = 'none';
         }
 
-        function handleReviewSubmit(event, orderId) {
-            event.preventDefault();
-
-            const selectElement = document.getElementById(`reviewed_user_id-${orderId}`);
-            const selectedValue = selectElement.value;
-
-            let actionUrl;
-            if (selectedValue.startsWith('merchant')) {
-                const merchantId = selectedValue.split('-')[1];
-                actionUrl = `/menu/${merchantId}`;
-            } else if (selectedValue.startsWith('delivery')) {
-                const deliveryPersonId = selectedValue.split('-')[1];
-                actionUrl = `/delivery_orders/${deliveryPersonId}`;
-            } else {
-                alert('請選擇有效的評論對象');
-                return;
-            }
-
-            const form = document.getElementById(`review-form-${orderId}`);
-            form.action = actionUrl;
-            form.submit();
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
-            // 初次加載時計算總金額
-            calculateTotal();
+            document.querySelectorAll('.close').forEach(function(element) {
+                element.addEventListener('click', function() {
+                    var orderId = element.dataset.orderId;
+                    hideReviewModal(orderId);
+                });
+            });
 
-            // 為所有 checkbox 綁定變更事件
             document.querySelectorAll('input[name="order_ids"]').forEach(function(checkbox) {
                 checkbox.addEventListener('change', calculateTotal);
             });
 
-            // 綁定彈窗關閉按鈕的事件
-            document.querySelectorAll('.close').forEach(function(element) {
-                element.addEventListener('click', function() {
-                    const orderId = element.dataset.orderId;
-                    hideReviewModal(orderId);
-                });
-            });
+            calculateTotal();  // 初始計算一次總金額
         });
     </script>
 </head>
@@ -78,49 +73,74 @@
 
     <main class="container">
         <h2>您的訂單列表</h2>
-        <form action="{{ url_for('confirm_order') }}" method="POST">
+        <form id="confirm-order-form" action="{{ url_for('confirm_order') }}" method="POST">
             <ul class="order-list">
                 {% if orders %}
                     {% for order in orders %}
                         <li class="order-item">
-                            <input type="checkbox" name="order_ids" value="{{ order.id }}" 
-                                   {% if order.status == '已確認' %} disabled {% endif %}>
+                            <input type="checkbox" name="order_ids" value="{{ order.id }}" {% if order.status == '已確認' %} disabled {% endif %}>
                             <span>訂單 #{{ order.id }}:</span>
                             <span>{{ order.item_name }}</span> - 
                             <span class="order-price" data-price="{{ order.price }}">金額: {{ order.price }}</span> - 
-                            <span class="order-status">狀態: {{ order.status }}</span> - 
-                            <span class="order-merchant-status">
-                                {% if order.acceptance_status == '已接單' %}
-                                    商家已接受
-                                {% elif order.acceptance_status == '已拒絕' %}
+                            <span id="order-status-{{ order.id }}" class="order-status">狀態: {{ order.status }}</span>
+                            <span id="merchant-status-{{ order.id }}" class="merchant-status">
+                                {% if order.merchant_acceptance_status == '已接單' %}
+                                    商家已通知外送員
+                                {% elif order.merchant_acceptance_status == '已拒絕' %}
                                     商家已拒絕
                                 {% else %}
                                     商家待確認
                                 {% endif %}
                             </span>
+                            <div class="delivery-status">
+                                {% if order.delivery_status == '已接單' %}
+                                    <span>外送員已接單</span>
+                                {% elif order.delivery_status == '取貨中' %}
+                                    <span>外送員正在取貨</span>
+                                {% elif order.delivery_status == '已送達' %}
+                                    <span>已送達</span>
+                                    {% if order.status != '已完成' %}
+                                    <form action="{{ url_for('confirm_receipt', order_id=order.id) }}" method="POST" class="inline-form">
+										<button id="confirm-btn-{{ order.id }}" type="submit" class="btn btn-success">確認收貨</button>
+									</form>
 
-                            <form action="#" id="review-form-{{ order.id }}" onsubmit="handleReviewSubmit(event, '{{ order.id }}')" method="POST" class="inline-form">
-                                <button type="submit" class="btn btn-danger">刪除</button>
-                                {% if order.status == '已確認' %}
-                                <button class="btn btn-info" type="button" onclick="showReviewModal('{{ order.id }}')">新增評論</button>
+                                    {% else %}
+                                        <span class="btn btn-success" disabled>訂單已完成</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span>外送員待確認</span>
                                 {% endif %}
-                            </form>
-                            
+                            </div>
+
+                            <!-- 刪除按鈕 -->
+                            <form action="{{ url_for('delete_order', order_id=order.id) }}" method="POST">
+								<button type="submit" class="btn btn-danger">刪除</button>
+							</form>
+
+
+                            <!-- 評論按鈕 -->
+                            {% if order.status == '已確認' %}
+                            <button class="btn btn-info" type="button" onclick="document.getElementById('review-modal-{{ order.id }}').style.display='block'">新增評論</button>
+                            {% endif %}
+
                             <!-- 評論彈窗 -->
-                            <div id="review-modal-{{ order.id }}" class="modal">
+                            <div id="review-modal-{{ order.id }}" class="modal" style="display: none;">
                                 <div class="modal-content">
                                     <span class="close" data-order-id="{{ order.id }}">&times;</span>
-                                    <form>
+                                    <form action="{{ url_for('add_review', order_id=order.id) }}" method="POST" onsubmit="return validateForm({{ order.id }})">
+
                                         <h3>新增評論</h3>
                                         <label for="rating-{{ order.id }}">評分 (1-5):</label>
                                         <input type="number" id="rating-{{ order.id }}" name="rating" min="1" max="5" required>
                                         <label for="comment-{{ order.id }}">評論:</label>
-                                        <textarea id="comment-{{ order.id }}" name="comment" rows="4" cols="50"></textarea>
+                                        <textarea id="comment-{{ order.id }}" name="comment" rows="4" cols="50" required></textarea>
                                         <label for="reviewed_user_id-{{ order.id }}">選擇評論對象:</label>
                                         <select id="reviewed_user_id-{{ order.id }}" name="reviewed_user_id" required>
                                             <option value="" disabled selected>選擇評論對象</option>
-                                            <option value="merchant-{{ order.merchant_id }}">商家</option>
-                                            <option value="delivery-{{ order.delivery_person_id }}">外送員</option>
+                                            <option value="{{ order.merchant_id }}">商家 (ID: {{ order.merchant_id }})</option>
+                                            {% if order.delivery_person_id %}
+                                                <option value="{{ order.delivery_person_id }}">外送員 (ID: {{ order.delivery_person_id }})</option>
+                                            {% endif %}
                                         </select>
                                         <button type="submit" class="btn btn-primary">提交評論</button>
                                     </form>
@@ -129,23 +149,24 @@
                         </li>
                     {% endfor %}
                     <li class="order-total">
-                        <strong id="total-price">總金額: ${{ total_price }}</strong>
+                        <strong id="total-price">總金額: $0.00</strong>
                     </li>
-                    <button class="btn btn-primary" type="submit">確認下單</button>
+                    <li>
+                        <button class="btn btn-primary" type="submit">確認下單</button>
+                    </li>
                 {% else %}
                     <li class="empty-orders">您沒有任何訂單。</li>
                 {% endif %}
             </ul>
         </form>
 
-        <!-- 返回鍵 -->
         <div class="back-button">
             <a href="{{ url_for('index') }}" class="btn btn-secondary">返回菜品列表</a>
         </div>
     </main>
 
     <footer>
-        <p>© 2024 菜品菜單管理系统. 美味每一天！</p>
+        <p>© 2024 菜品菜單管理系統. 美味每一天！</p>
     </footer>
 
     <style>
@@ -158,6 +179,7 @@
             width: 100%;
             height: 100%;
             overflow: auto;
+            background-color: rgb(0,0,0);
             background-color: rgba(0,0,0,0.4);
         }
         .modal-content {

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查看評論</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h1>查看評論</h1>
+        <div>
+            <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                <button class="btn btn-secondary">登出</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+        {% if reviews %}
+            <ul class="review-list">
+                {% for review in reviews %}
+                    <li class="review-item">
+                        <span>商品名稱: {{ review.item_name }}</span> - 
+                        <span>評分: {{ review.rating }}</span> - 
+                        <span>評論: {{ review.comment }}</span> - 
+                        <span>來自: {{ review.username }}</span> - 
+                        <span>日期: {{ review.created_at }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>目前沒有評論。</p>
+        {% endif %}
+    
+
+		<div class="back-button">
+            <a href="{{ url_for('menu') }}" class="btn btn-secondary">返回</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2024 評論系統</p>
+    </footer>
+</body>
+</html>
