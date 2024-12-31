@@ -7,26 +7,62 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script>
         function calculateTotal() {
-            let total = 0;
-            const checkboxes = document.querySelectorAll('input[name="order_ids"]:checked:not(:disabled)');
-            checkboxes.forEach(checkbox => {
-                const orderItem = checkbox.closest('.order-item');
-                const orderPrice = orderItem.querySelector('.order-price');
-                total += parseFloat(orderPrice.dataset.price);
+            let total = 0.0;
+            document.querySelectorAll('input[name="order_ids"]:checked').forEach(function(checkbox) {
+                const price = parseFloat(checkbox.closest('li').querySelector('.order-price').dataset.price);
+                total += price;
             });
             document.getElementById('total-price').textContent = `總金額: $${total.toFixed(2)}`;
         }
 
-        function deleteOrder(orderId) {
-            fetch(`/delete_order/${orderId}`, {
-                method: 'POST',
-            }).then(response => {
-                if (response.ok) {
-                    document.getElementById(`order-${orderId}`).remove();  // 移除該訂單
-                    calculateTotal();  // 更新總金額
-                }
-            });
+        function showReviewModal(orderId) {
+            document.getElementById(`review-modal-${orderId}`).style.display = 'block';
         }
+
+        function hideReviewModal(orderId) {
+            document.getElementById(`review-modal-${orderId}`).style.display = 'none';
+        }
+
+        function handleReviewSubmit(event, orderId) {
+            event.preventDefault();
+
+            const selectElement = document.getElementById(`reviewed_user_id-${orderId}`);
+            const selectedValue = selectElement.value;
+
+            let actionUrl;
+            if (selectedValue.startsWith('merchant')) {
+                const merchantId = selectedValue.split('-')[1];
+                actionUrl = `/menu/${merchantId}`;
+            } else if (selectedValue.startsWith('delivery')) {
+                const deliveryPersonId = selectedValue.split('-')[1];
+                actionUrl = `/delivery_orders/${deliveryPersonId}`;
+            } else {
+                alert('請選擇有效的評論對象');
+                return;
+            }
+
+            const form = document.getElementById(`review-form-${orderId}`);
+            form.action = actionUrl;
+            form.submit();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初次加載時計算總金額
+            calculateTotal();
+
+            // 為所有 checkbox 綁定變更事件
+            document.querySelectorAll('input[name="order_ids"]').forEach(function(checkbox) {
+                checkbox.addEventListener('change', calculateTotal);
+            });
+
+            // 綁定彈窗關閉按鈕的事件
+            document.querySelectorAll('.close').forEach(function(element) {
+                element.addEventListener('click', function() {
+                    const orderId = element.dataset.orderId;
+                    hideReviewModal(orderId);
+                });
+            });
+        });
     </script>
 </head>
 <body>
@@ -46,29 +82,54 @@
             <ul class="order-list">
                 {% if orders %}
                     {% for order in orders %}
-                        <li id="order-{{ order.id }}" class="order-item">
+                        <li class="order-item">
                             <input type="checkbox" name="order_ids" value="{{ order.id }}" 
-                                {% if order.status == '已確認' %} disabled {% endif %} 
-                                onclick="calculateTotal()">
+                                   {% if order.status == '已確認' %} disabled {% endif %}>
                             <span>訂單 #{{ order.id }}:</span>
                             <span>{{ order.item_name }}</span> - 
                             <span class="order-price" data-price="{{ order.price }}">金額: {{ order.price }}</span> - 
                             <span class="order-status">狀態: {{ order.status }}</span> - 
-                            <span class="order-submitted">
-                                {% if order.status == '已確認' %}
-                                    已下單
+                            <span class="order-merchant-status">
+                                {% if order.acceptance_status == '已接單' %}
+                                    商家已接受
+                                {% elif order.acceptance_status == '已拒絕' %}
+                                    商家已拒絕
                                 {% else %}
-                                    未下單
+                                    商家待確認
                                 {% endif %}
                             </span>
 
-                            {% if order.status != '已確認' %}
-                                <button type="button" class="btn btn-danger" onclick="deleteOrder({{ order.id }})">刪除</button>
-                            {% endif %}
+                            <form action="#" id="review-form-{{ order.id }}" onsubmit="handleReviewSubmit(event, '{{ order.id }}')" method="POST" class="inline-form">
+                                <button type="submit" class="btn btn-danger">刪除</button>
+                                {% if order.status == '已確認' %}
+                                <button class="btn btn-info" type="button" onclick="showReviewModal('{{ order.id }}')">新增評論</button>
+                                {% endif %}
+                            </form>
+                            
+                            <!-- 評論彈窗 -->
+                            <div id="review-modal-{{ order.id }}" class="modal">
+                                <div class="modal-content">
+                                    <span class="close" data-order-id="{{ order.id }}">&times;</span>
+                                    <form>
+                                        <h3>新增評論</h3>
+                                        <label for="rating-{{ order.id }}">評分 (1-5):</label>
+                                        <input type="number" id="rating-{{ order.id }}" name="rating" min="1" max="5" required>
+                                        <label for="comment-{{ order.id }}">評論:</label>
+                                        <textarea id="comment-{{ order.id }}" name="comment" rows="4" cols="50"></textarea>
+                                        <label for="reviewed_user_id-{{ order.id }}">選擇評論對象:</label>
+                                        <select id="reviewed_user_id-{{ order.id }}" name="reviewed_user_id" required>
+                                            <option value="" disabled selected>選擇評論對象</option>
+                                            <option value="merchant-{{ order.merchant_id }}">商家</option>
+                                            <option value="delivery-{{ order.delivery_person_id }}">外送員</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-primary">提交評論</button>
+                                    </form>
+                                </div>
+                            </div>
                         </li>
                     {% endfor %}
                     <li class="order-total">
-                        <strong id="total-price">總金額: $0.00</strong>
+                        <strong id="total-price">總金額: ${{ total_price }}</strong>
                     </li>
                     <button class="btn btn-primary" type="submit">確認下單</button>
                 {% else %}
@@ -86,5 +147,38 @@
     <footer>
         <p>© 2024 菜品菜單管理系统. 美味每一天！</p>
     </footer>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
 </body>
 </html>

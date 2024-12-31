@@ -44,37 +44,51 @@
                         <span>金額: ${{ order.price }}</span> - 
                         <span class="order-status">狀態: {{ order.status }}</span> - 
                         <span class="delivery-status">外送員狀態: 
-                            {% if order.delivery_status == '已接單' %}
+                            {% if order.delivery_status == '已通知' %}
+                                已通知
+                            {% elif order.delivery_status == '已接單' %}
                                 已接單
                             {% else %}
                                 未接單
                             {% endif %}
                         </span>
-                        <form action="{{ url_for('confirm_for_delivery', order_id=order.id) }}" method="POST" class="inline-form">
-                            <button class="btn btn-primary">通知外送員</button>
-                        </form>
+                        {% if order.acceptance_status == '已拒絕' %}
+                            <span class="acceptance-status">已拒絕</span>
+                        {% elif order.acceptance_status == '已接單' %}
+                            <form action="{{ url_for('confirm_for_delivery', order_id=order.id) }}" method="POST" class="inline-form">
+                                <button class="btn btn-primary" type="submit">通知外送員</button>
+                            </form>
+                        {% else %}
+                            <form action="{{ url_for('merchant_accept_order', order_id=order.id) }}" method="POST" class="inline-form">
+                                <button class="btn btn-secondary" type="submit">接單</button>
+                            </form>
+
+                            <form action="{{ url_for('merchant_reject_order', order_id=order.id) }}" method="POST" class="inline-form">
+                                <button class="btn btn-danger" type="submit">拒絕訂單</button>
+                            </form>
+                            
+                        {% endif %}
                     </li>
                 {% endfor %}
             {% else %}
-                <li class="empty-orders">沒有任何代處理訂單。</li>
+                <li class="empty-orders">沒有任何待處理訂單。</li>
             {% endif %}
         </ul>
+
+        <h2>🌟 顧客評論</h2>
+        <a href="{{ url_for('view_reviews', user_id=session['user_id']) }}" class="btn btn-primary">查看評論</a>
 
         <h3>📋 添加新菜品</h3>
         <form method="POST" class="add-item-form">
             <label for="item_name">菜品名稱:</label>
             <input type="text" id="item_name" name="item_name" required>
-
             <label for="description">菜品描述:</label>
             <textarea id="description" name="description" required></textarea>
-
             <label for="price">價格:</label>
             <input type="number" id="price" name="price" step="0.01" required>
-
             <button type="submit" class="btn btn-primary">添加菜品</button>
         </form>
     </main>
-
     <footer>
         <p>© 2024 菜品菜單管理系统. 管理您的美味菜單！</p>
     </footer>

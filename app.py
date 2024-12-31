@@ -43,6 +43,7 @@ def init_db():
                     status TEXT NOT NULL,
                     price REAL NOT NULL,
                     item_name TEXT NOT NULL,
+                    acceptance_status TEXT DEFAULT '',
                     FOREIGN KEY (customer_id) REFERENCES users (id),
                     FOREIGN KEY (merchant_id) REFERENCES users (id),
                     FOREIGN KEY (delivery_person_id) REFERENCES users (id),
@@ -50,22 +51,27 @@ def init_db():
 
     # 創建店家的訂單表
     conn.execute('''CREATE TABLE IF NOT EXISTS merchant_orders (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    customer_id INTEGER NOT NULL,
-                    merchant_id INTEGER NOT NULL,
-                    item_id INTEGER NOT NULL,
-                    status TEXT NOT NULL,
-                    price REAL NOT NULL,
-                    item_name TEXT NOT NULL,
-                    FOREIGN KEY (customer_id) REFERENCES users (id),
-                    FOREIGN KEY (merchant_id) REFERENCES users (id),
-                    FOREIGN KEY (item_id) REFERENCES menu (id))''')
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        order_id INTEGER,
+                        customer_id INTEGER NOT NULL,
+                        merchant_id INTEGER NOT NULL,
+                        item_id INTEGER NOT NULL,
+                        status TEXT NOT NULL,
+                        delivery_status TEXT DEFAULT '未接單',
+                        acceptance_status TEXT DEFAULT '未處理',
+                        price REAL NOT NULL,
+                        item_name TEXT NOT NULL,
+                        FOREIGN KEY (customer_id) REFERENCES users (id),
+                        FOREIGN KEY (merchant_id) REFERENCES users (id),
+                        FOREIGN KEY (item_id) REFERENCES menu (id),
+                        FOREIGN KEY (order_id) REFERENCES orders (id))''')
 
     # 創建外送訂單表
     conn.execute('''CREATE TABLE IF NOT EXISTS delivery_orders (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     customer_id INTEGER NOT NULL,
                     merchant_id INTEGER NOT NULL,
+                    merchant_order_id INTEGER NOT NULL,
                     delivery_person_id INTEGER,
                     item_id INTEGER NOT NULL,
                     status TEXT NOT NULL,
@@ -84,11 +90,26 @@ def init_db():
      
     # 創建報告表 
     conn.execute('''CREATE TABLE IF NOT EXISTS reports (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 user_id INTEGER NOT NULL, total_received REAL, 
-                total_orders INTEGER, total_due REAL,
-                 report_type TEXT NOT NULL,
-                 FOREIGN KEY (user_id) REFERENCES users (id))''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    report_type TEXT NOT NULL,
+                    total_received REAL DEFAULT 0,
+                    total_orders INTEGER DEFAULT 0,
+                    total_due REAL DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id))''')
+    
+    conn.execute('''CREATE TABLE IF NOT EXISTS reviews (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        reviewed_user_id INTEGER NOT NULL,
+                        order_id INTEGER NOT NULL,
+                        rating INTEGER NOT NULL,
+                        comment TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id),
+                        FOREIGN KEY (reviewed_user_id) REFERENCES users (id),
+                        FOREIGN KEY (order_id) REFERENCES orders (id))''')
+
    
 
 
@@ -112,6 +133,7 @@ def init_db():
 
 # 初始化数据库
 init_db()
+
 
 # 登录功能
 @app.route('/login', methods=['GET', 'POST'])
@@ -202,28 +224,151 @@ def menu():
         SELECT mo.*, 
                CASE WHEN do.status = '已接單' THEN '已接單' ELSE '未接單' END AS delivery_status
         FROM merchant_orders mo
-        LEFT JOIN delivery_orders do ON mo.id = do.id
+        LEFT JOIN delivery_orders do ON mo.id = do.merchant_order_id
         WHERE mo.merchant_id = ?
     ''', (session['user_id'],)).fetchall()
     conn.close()
 
     return render_template('menu.html', menu_items=menu_items, merchant_orders=merchant_orders)
+    
 
 
-
-# 更新订单状态
-@app.route('/update_order_status/<int:order_id>', methods=['POST'])
-def update_order_status(order_id):
+@app.route('/merchant_accept_order/<int:order_id>', methods=['POST'])
+def merchant_accept_order(order_id):
     if 'user_id' not in session or session['role'] != 'merchant':
         return redirect(url_for('login'))
 
     conn = get_db_connection()
-    conn.execute('UPDATE orders SET status = "已确认" WHERE id = ?', (order_id,))
-    conn.commit()
+    cursor = conn.cursor()
+
+    try:
+        # 更新訂單為已接單
+        cursor.execute('UPDATE merchant_orders SET acceptance_status = "已接單" WHERE id = ?', (order_id,))
+        cursor.execute('UPDATE orders SET acceptance_status = "已接單" WHERE id = ?', (order_id,))
+        conn.commit()
+        flash('訂單已接收。', 'success')
+    except sqlite3.Error as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        print(f'SQLite Error: {e}')  # 打印錯誤信息到控制台
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('menu'))
+
+
+
+
+
+
+@app.route('/merchant_reject_order/<int:order_id>', methods=['POST'])
+def merchant_reject_order(order_id):
+    if 'user_id' not in session or session['role'] != 'merchant':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # 更新訂單為已拒絕
+        cursor.execute('UPDATE merchant_orders SET acceptance_status = "已拒絕" WHERE id = ?', (order_id,))
+        cursor.execute('UPDATE orders SET acceptance_status = "已拒絕" WHERE id = ?', (order_id,))
+        conn.commit()
+        flash('訂單已拒絕。', 'success')
+    except sqlite3.Error as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        print(f'SQLite Error: {e}')  # 打印錯誤信息到控制台
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('menu'))
+
+
+
+
+@app.route('/add_review/<int:order_id>', methods=['POST'])
+def add_review(order_id):
+    if 'user_id' not in session or session['role'] != 'customer':
+        return redirect(url_for('login'))
+
+    rating = request.form['rating']
+    comment = request.form['comment']
+    reviewed_user_id = request.form['reviewed_user_id']
+
+    if not reviewed_user_id:
+        flash('請選擇一個評論對象', 'danger')
+        return redirect(url_for('orders'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # 插入評論
+        cursor.execute('''
+            INSERT INTO reviews (user_id, reviewed_user_id, order_id, rating, comment)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (session['user_id'], reviewed_user_id, order_id, rating, comment))
+
+        conn.commit()
+        flash('評論已提交。', 'success')
+    except sqlite3.Error as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        print(f'SQLite Error: {e}')  # 打印錯誤信息到控制台
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('orders'))
+
+
+@app.route('/view_delivery_reviews/<int:user_id>', methods=['GET'])
+def view_delivery_reviews(user_id):
+    if 'user_id' not in session or session['role'] != 'delivery_person':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    reviews = cursor.execute('''
+        SELECT reviews.rating, reviews.comment, users.username, reviews.created_at
+        FROM reviews
+        JOIN users ON reviews.user_id = users.id
+        WHERE reviews.reviewed_user_id = ?
+    ''', (user_id,)).fetchall()
+
+    cursor.close()
     conn.close()
 
-    flash('訂單已確認！', 'success')
-    return redirect(url_for('menu'))
+    return render_template('re.html', reviews=reviews)
+
+
+
+
+@app.route('/view_reviews/<int:user_id>', methods=['GET'])
+def view_reviews(user_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    reviews = cursor.execute('''
+        SELECT reviews.rating, reviews.comment, users.username, reviews.created_at
+        FROM reviews
+        JOIN users ON reviews.user_id = users.id
+        WHERE reviews.reviewed_user_id = ?
+    ''', (user_id,)).fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template('view_reviews.html', reviews=reviews)
+
+
 
 
 
@@ -255,13 +400,19 @@ def place_order(item_id):
     # 获取菜品信息
     item = conn.execute('SELECT * FROM menu WHERE id = ?', (item_id,)).fetchone()
 
+    # 获取价格和菜品名称
+    price = item['price']
+    item_name = item['item_name']
+
     # 创建订单
     conn.execute('''
-        INSERT INTO orders (customer_id, merchant_id, item_id, status)
-        VALUES (?, ?, ?, ?)
-    ''', (session['user_id'], item['merchant_id'], item['id'], '待处理'))
+        INSERT INTO orders (customer_id, merchant_id, item_id, item_name, price, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (session['user_id'], item['merchant_id'], item['id'], item_name, price, '待处理'))
     conn.commit()
     conn.close()
+
+
 
     flash('訂單已下單！', 'success')
     return redirect(url_for('orders'))  # 重定向到订单页面
@@ -275,16 +426,16 @@ def delete_order(order_id):
     order = conn.execute('SELECT status FROM orders WHERE id = ? AND customer_id = ?', (order_id, session['user_id'])).fetchone()
 
     if order:
-        print(f"Deleting order with ID {order_id}, current status: {order['status']}")  # 調試輸出
+        
         if order['status'] == '已確認':
             flash('已確認的訂單無法刪除', 'danger')
         else:
-            print(f"Deleting order from database with ID {order_id}")  # 調試輸出
+           
             conn.execute('DELETE FROM orders WHERE id = ? AND customer_id = ?', (order_id, session['user_id']))
             conn.commit()
             flash('訂單已刪除', 'success')
     else:
-        print(f"Order not found with ID {order_id}")  # 調試輸出
+        
         flash('訂單未找到', 'danger')
     
     conn.close()
@@ -321,10 +472,18 @@ def confirm_order():
         ''', (order_id, session['user_id'])).fetchone()
         
         if order:
+            # 更新外送員的狀態為“已接單”
+            cursor.execute(''' 
+                UPDATE delivery_orders 
+                SET delivery_person_id = ?, status = ? 
+                WHERE id = ? 
+            ''', (session['user_id'], '已接單', order_id))
+            
             cursor.execute('''
-                INSERT INTO merchant_orders (customer_id, merchant_id, item_id, status, price, item_name)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (order['customer_id'], order['merchant_id'], order['item_id'], '已確認', order['price'], order['item_name']))
+                INSERT INTO merchant_orders (customer_id, merchant_id, item_id, status, delivery_status, price, item_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (order['customer_id'], order['merchant_id'], order['item_id'], '已確認', '待處理', order['price'], order['item_name']))
+            
             cursor.execute('UPDATE orders SET status = "已確認" WHERE id = ?', (order['id'],))
 
     conn.commit()
@@ -332,6 +491,8 @@ def confirm_order():
 
     flash('訂單已確認並通知商家！', 'success')
     return redirect(url_for('orders'))
+
+
 
 @app.route('/orders', methods=['GET', 'POST'])
 def orders():
@@ -343,7 +504,10 @@ def orders():
         SELECT orders.id AS id,
                menu.item_name AS item_name,
                menu.price AS price,
-               orders.status AS status
+               orders.status AS status,
+               orders.acceptance_status AS acceptance_status,
+               orders.merchant_id AS merchant_id,
+               orders.delivery_person_id AS delivery_person_id
         FROM orders
         JOIN menu ON orders.item_id = menu.id
         WHERE orders.customer_id = ?
@@ -368,27 +532,38 @@ def confirm_for_delivery(order_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 獲取商家確認的訂單
-    order = cursor.execute('SELECT * FROM merchant_orders WHERE id = ?', (order_id,)).fetchone()
-    print(f"Order to be transferred: {order}")  # 調試輸出
+    try:
+        # 獲取商家確認的訂單
+        order = cursor.execute('SELECT * FROM merchant_orders WHERE id = ?', (order_id,)).fetchone()
+        
+        if order is None:
+            flash('未找到訂單！', 'danger')
+            return redirect(url_for('menu'))
 
-    # 檢查訂單是否存在
-    if order is None:
-        flash('未找到訂單！', 'danger')
-        return redirect(url_for('menu'))
+        # 將訂單插入到外送訂單列表
+        cursor.execute('''
+            INSERT INTO delivery_orders (customer_id, merchant_id, delivery_person_id, item_id, status, price, item_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (order['customer_id'], order['merchant_id'], None, order['item_id'], '待配送', order['price'], order['item_name']))
+       
+        # 更新訂單為已通知外送員
+        cursor.execute('UPDATE merchant_orders SET delivery_status = "已通知" WHERE id = ?', (order_id,))
+        conn.commit()
+        flash('订单已确认并发送给外送小哥！', 'success')
+    except Exception as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
 
-    # 將訂單插入到外送訂單列表
-    cursor.execute('''
-        INSERT INTO delivery_orders (customer_id, merchant_id, delivery_person_id, item_id, status, price, item_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (order['customer_id'], order['merchant_id'], None, order['item_id'], '待配送', order['price'], order['item_name']))
-    print(f"Inserted order {order['id']} into delivery_orders")  # 調試輸出
-
-    conn.commit()
-    conn.close()
-
-    flash('订单已确认并发送给外送小哥！', 'success')
     return redirect(url_for('menu'))
+
+
+
+
+
+
 
 @app.route('/deliver_order/<int:order_id>', methods=['POST'])
 def deliver_order(order_id):
@@ -396,13 +571,61 @@ def deliver_order(order_id):
         return redirect(url_for('login'))
 
     conn = get_db_connection()
-    conn.execute('UPDATE delivery_orders SET delivery_person_id = ?, status = ? WHERE id = ?',
-                 (session['user_id'], '已接單', order_id))
+    cursor = conn.cursor()
+
+    # 檢查訂單是否存在並且狀態是 "待配送"
+    cursor.execute('SELECT status FROM delivery_orders WHERE id = ?', (order_id,))
+    order = cursor.fetchone()
+
+    if not order:
+        flash('訂單不存在或已過期！', 'error')
+        conn.close()
+        return redirect(url_for('delivery_orders'))
+    
+    if order['status'] != '待配送':
+        flash('該訂單目前無法接單，狀態為：' + order['status'], 'error')
+        conn.close()
+        return redirect(url_for('delivery_orders'))
+
+    # 更新外送訂單的狀態和接單人
+    cursor.execute('UPDATE delivery_orders SET delivery_person_id = ?, status = ? WHERE id = ?',
+                (session['user_id'], '已接單', order_id))
+
+    # 更新商家訂單的狀態為 "已接單"
+    cursor.execute('UPDATE merchant_orders SET  delivery_status = ? WHERE id = ?',
+                ( '已接單', order_id))
+
     conn.commit()
     conn.close()
 
-    flash('订单已接单！', 'success')
+
+    flash('訂單已成功接單！', 'success')
     return redirect(url_for('delivery_orders'))
+
+
+@app.route('/accept_order/<int:order_id>', methods=['POST'])
+def accept_order(order_id):
+    if 'user_id' not in session or session['role'] != 'delivery_person':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # 更新外送訂單為已接單
+        cursor.execute('UPDATE delivery_orders SET status = "已接單", delivery_person_id = ? WHERE id = ?', (session['user_id'], order_id))
+        conn.commit()
+        flash('您已接單。', 'success')
+    except Exception as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('delivery_orders'))
+
+
 
 
 
@@ -433,24 +656,7 @@ def edit_item(item_id):
 
 
 
-@app.route('/delivery')
-def delivery_dashboard():
-    if 'user_id' not in session or session['role'] != 'delivery_person':
-        return redirect(url_for('login'))
-
-    # 配送员管理订单状态等信息
-    conn = get_db_connection()
-    orders = conn.execute('''
-        SELECT delivery_orders.id AS id, 
-               menu.item_name AS item_name, 
-               delivery_orders.status AS status
-        FROM delivery_orders
-        JOIN menu ON delivery_orders.item_id = menu.id
-        WHERE delivery_orders.delivery_person_id = ?
-    ''', (session['user_id'],)).fetchall()
-    conn.close()
-
-    return render_template('delivery_orders.html', orders=orders)
+    
 
 
 
@@ -475,56 +681,65 @@ def delivery_orders():
 
     return render_template('delivery_orders.html', delivery_orders=orders)
 
-@app.route('/settlements', methods=['POST', 'GET'])
-def settlements():
+@app.route('/complete_order/<int:order_id>', methods=['POST'])
+def complete_order(order_id):
+    if 'user_id' not in session or session['role'] != 'customer':
+        return redirect(url_for('login'))
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # 計算商家應收金額
-        merchants = cursor.execute('''SELECT merchant_id, SUM(price) as total_received
-                                      FROM merchant_orders
-                                      WHERE status = "已完成"
-                                      GROUP BY merchant_id''').fetchall()
+        # 更新訂單狀態為已完成
+        cursor.execute('UPDATE orders SET status = "已完成" WHERE id = ?', (order_id,))
         
-        for merchant in merchants:
-            cursor.execute('''INSERT INTO transactions (user_id, amount, transaction_type) 
-                              VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '應收'))
-            cursor.execute('''INSERT INTO reports (user_id, total_received, report_type) 
-                              VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '商家'))
+        # 獲取訂單詳細信息
+        order = cursor.execute('SELECT * FROM orders WHERE id = ?', (order_id,)).fetchone()
         
-        # 計算外送員接單數
-        delivery_persons = cursor.execute('''SELECT delivery_person_id, COUNT(*) as total_orders
-                                             FROM orders
-                                             WHERE delivery_person_id IS NOT NULL
-                                             GROUP BY delivery_person_id''').fetchall()
-        
-        for person in delivery_persons:
-            cursor.execute('''INSERT INTO reports (user_id, total_orders, report_type) 
-                              VALUES (?, ?, ?)''', (person['delivery_person_id'], person['total_orders'], '外送員'))
-        
-        # 計算客戶應付金額
-        customers = cursor.execute('''SELECT customer_id, SUM(price) as total_due
-                                      FROM orders
-                                      WHERE status = "已完成"
-                                      GROUP BY customer_id''').fetchall()
-        
-        for customer in customers:
-            cursor.execute('''INSERT INTO reports (user_id, total_due, report_type) 
-                              VALUES (?, ?, ?)''', (customer['customer_id'], customer['total_due'], '客戶'))
-        
+        # 記錄交易
+        cursor.execute('''
+            INSERT INTO transactions (user_id, amount, transaction_type)
+            VALUES (?, ?, '支付')
+        ''', (order['customer_id'], order['price']))
+
+        # 更新商家報告
+        cursor.execute('''
+            INSERT INTO reports (user_id, report_type, total_received)
+            VALUES (?, '商家', ?)
+            ON CONFLICT(user_id, report_type) DO UPDATE SET
+            total_received = total_received + excluded.total_received
+        ''', (order['merchant_id'], order['price']))
+
+        # 更新外送員報告
+        if order['delivery_person_id']:
+            cursor.execute('''
+                INSERT INTO reports (user_id, report_type, total_orders)
+                VALUES (?, '外送員', 1)
+                ON CONFLICT(user_id, report_type) DO UPDATE SET
+                total_orders = total_orders + 1
+            ''', (order['delivery_person_id'],))
+
+        # 更新客戶報告
+        cursor.execute('''
+            INSERT INTO reports (user_id, report_type, total_due)
+            VALUES (?, '客戶', ?)
+            ON CONFLICT(user_id, report_type) DO UPDATE SET
+            total_due = total_due + excluded.total_due
+        ''', (order['customer_id'], order['price']))
+
         conn.commit()
-        flash('結算完成', 'success')
-    
+        flash('訂單已完成。', 'success')
     except sqlite3.Error as e:
+        flash(f'發生錯誤：{e}', 'danger')
+        print(f'SQLite Error: {e}')  # 打印錯誤信息到控制台
         conn.rollback()
-        flash(f'結算失敗: {e}', 'error')
-    
     finally:
-        cursor.close()  # 確保游標在操作完成後關閉
-        conn.close()  # 確保連接在操作完成後關閉
-    
-    return redirect(url_for('view_reports', report_type='settle'))
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for('menu'))
+
+
 
 @app.route('/reports/<string:report_type>', methods=['GET'])
 def view_reports(report_type):
@@ -557,6 +772,11 @@ def view_reports(report_type):
                            report_type=report_type)
 
 
+
+
+
+
+
 """import sqlite3  #刪除資料庫資料
 
 def clear_orders():
@@ -564,7 +784,7 @@ def clear_orders():
     cursor = conn.cursor()
 
     # 刪除 orders 表中的所有資料
-    cursor.execute('DELETE FROM orders')
+    cursor.execute('DELETE FROM "merchant_orders"')
     conn.commit()
 
     conn.close()
@@ -573,6 +793,38 @@ def clear_orders():
 # 執行清空訂單表操作
 clear_orders()
 """
+
+"""import sqlite3
+
+# 連接到資料庫
+conn = sqlite3.connect('new_delivery.db')  # 請將 'your_database_file.db' 替換為你的資料庫檔案名稱
+cursor = conn.cursor()
+
+# 刪除現有的 merchant_orders 資料表（如果存在）
+cursor.execute("DROP TABLE IF EXISTS reviews")
+
+# 重新創建 merchant_orders 資料表
+cursor.execute('''CREATE TABLE IF NOT EXISTS reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    reviewed_user_id INTEGER NOT NULL,
+                    order_id INTEGER NOT NULL,
+                    rating INTEGER NOT NULL,
+                    comment TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id),
+                    FOREIGN KEY (reviewed_user_id) REFERENCES users (id),
+                    FOREIGN KEY (order_id) REFERENCES orders (id))''')
+
+# 提交更改
+conn.commit()
+
+# 關閉資料庫連接
+conn.close()
+
+print("merchant_orders 資料表已刪除並重新建立")"""
+
+
 
 
 

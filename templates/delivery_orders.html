@@ -8,7 +8,7 @@
 </head>
 <body>
     <header class="navbar">
-        <h1>🚚 待配送订单</h1>
+        <h1>🚚 外送員頁面</h1>
         <div>
             <p>欢迎，{{ session['username'] }}！</p>
             <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
@@ -25,12 +25,14 @@
                     <li class="order-item">
                         <span>客户：{{ order.customer_name }}</span><br>
                         <span>菜品：{{ order.item_name }}</span><br>
-                        <span>价格：¥{{ order.price }} 元</span>
-                        <span>状态：{{ order.status }}</span>
+                        <span>价格：¥{{ order.price }} 元</span><br>
+                        
                         {% if order.status == '待配送' %}
                             <form action="{{ url_for('deliver_order', order_id=order.id) }}" method="POST" class="inline-form">
                                 <button class="btn btn-primary">接单</button>
                             </form>
+                        {% elif order.status == '已接單' %}
+                            <span>已接單</span>
                         {% endif %}
                     </li>
                 {% endfor %}
@@ -38,6 +40,10 @@
                 <li class="empty-orders">没有任何待配送订单。</li>
             {% endif %}
         </ul>
+
+        <h2>🌟 顧客評論</h2>
+        <a href="{{ url_for('view_delivery_reviews', user_id=session['user_id']) }}" class="btn btn-primary">查看評論</a>
+        
     </main>
 
     <footer>
