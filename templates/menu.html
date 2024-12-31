@@ -48,26 +48,43 @@
                                 已通知
                             {% elif order.delivery_status == '已接單' %}
                                 已接單
+							{% elif order.delivery_status == '取貨中' %}
+								取貨中
+                            {% elif order.delivery_status == '已送達' %}
+                                已送達
+                            {% elif order.status == '已完成' %}
+                                訂單已完成
                             {% else %}
                                 未接單
                             {% endif %}
                         </span>
                         {% if order.acceptance_status == '已拒絕' %}
-                            <span class="acceptance-status">已拒絕</span>
-                        {% elif order.acceptance_status == '已接單' %}
-                            <form action="{{ url_for('confirm_for_delivery', order_id=order.id) }}" method="POST" class="inline-form">
-                                <button class="btn btn-primary" type="submit">通知外送員</button>
-                            </form>
-                        {% else %}
-                            <form action="{{ url_for('merchant_accept_order', order_id=order.id) }}" method="POST" class="inline-form">
-                                <button class="btn btn-secondary" type="submit">接單</button>
-                            </form>
+							<span class="acceptance-status">已拒絕</span>
+						{% elif order.status == '已完成' %}
+							<span class="order-status">訂單已完成</span>
+						{% elif order.acceptance_status == '已接單' and order.status != '已完成' %}
+							{% if order.delivery_status == '已通知' %}
+								<span class="btn btn-primary" disabled>已通知外送員</span>
+							{% elif order.delivery_status == '已接單' %}
+								<span class="btn btn-primary" disabled>已接單</span>
+							{% elif order.delivery_status == '已送達' %}
+								<span class="btn btn-primary" disabled>已送達</span>
+							{% else %}
+								<form action="{{ url_for('confirm_for_delivery', order_id=order.id) }}" method="POST" class="inline-form">
+									<button class="btn btn-primary" type="submit">通知外送員</button>
+								</form>
+							{% endif %}
+						{% else %}
+							<form action="{{ url_for('merchant_accept_order', order_id=order.id) }}" method="POST" class="inline-form">
+								<button class="btn btn-secondary" type="submit">接單</button>
+							</form>
 
-                            <form action="{{ url_for('merchant_reject_order', order_id=order.id) }}" method="POST" class="inline-form">
-                                <button class="btn btn-danger" type="submit">拒絕訂單</button>
-                            </form>
-                            
-                        {% endif %}
+							<form action="{{ url_for('merchant_reject_order', order_id=order.id) }}" method="POST" class="inline-form">
+								<button class="btn btn-danger" type="submit">拒絕訂單</button>
+							</form>
+						{% endif %}
+
+
                     </li>
                 {% endfor %}
             {% else %}

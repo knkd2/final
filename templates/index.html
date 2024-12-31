@@ -22,6 +22,7 @@
     </header>
 
     <main class="container">
+        <!-- 菜品列表 -->
         <h3>菜品列表</h3>
         <ul class="menu-list">
             {% for item in menu_items %}
@@ -36,6 +37,11 @@
                 </li>
             {% endfor %}
         </ul>
+
+        <!-- 訂單內容 -->
+        {% if session.get('user_id') and session['role'] == 'customer' %}
+            <a href="{{ url_for('orders') }}" class="btn btn-primary">查看訂單</a>
+        {% endif %}
     </main>
 
     <footer>

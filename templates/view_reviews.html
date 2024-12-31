@@ -21,6 +21,7 @@
             <ul class="review-list">
                 {% for review in reviews %}
                     <li class="review-item">
+                        <span>商品名稱: {{ review.item_name }}</span> - 
                         <span>評分: {{ review.rating }}</span> - 
                         <span>評論: {{ review.comment }}</span> - 
                         <span>來自: {{ review.username }}</span> - 
@@ -31,8 +32,10 @@
         {% else %}
             <p>目前沒有評論。</p>
         {% endif %}
+    
+
 		<div class="back-button">
-            <a href="{{ url_for('menu') }}" class="btn btn-secondary">返回菜品列表</a>
+            <a href="{{ url_for('menu') }}" class="btn btn-secondary">返回</a>
         </div>
     </main>
 
