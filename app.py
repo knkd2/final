@@ -76,26 +76,7 @@ def init_db():
                     FOREIGN KEY (delivery_person_id) REFERENCES users (id),
                     FOREIGN KEY (item_id) REFERENCES menu (id))''')
 
-
-    # 添加交易明細表
-    conn.execute('''CREATE TABLE IF NOT EXISTS transactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    amount REAL NOT NULL,
-                    transaction_type TEXT NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users (id))''')
-
-    # 添加報告表
-    conn.execute('''CREATE TABLE IF NOT EXISTS reports (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    total_received REAL,
-                    total_orders INTEGER,
-                    total_due REAL,
-                    report_type TEXT NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users (id))''')
-
-
+   
 
 
 
@@ -352,11 +333,12 @@ def orders():
         WHERE orders.customer_id = ?
     ''', (session['user_id'],)).fetchall()
 
-    # 計算總金額
-    total_price = sum(order['price'] for order in orders)
+    # 只計算未確認的訂單金額
+    total_price = sum(order['price'] for order in orders if order['status'] != '已確認')
 
     conn.close()
     return render_template('orders.html', orders=orders, total_price=total_price)
+
 
 
 
@@ -476,79 +458,6 @@ def delivery_orders():
     conn.close()
 
     return render_template('delivery_orders.html', delivery_orders=orders)
-
-@app.route('/settle_accounts', methods=['POST'])
-def settle_accounts():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 計算商家應收金額
-    merchants = cursor.execute('''SELECT merchant_id, SUM(price) as total_received
-                                  FROM merchant_orders
-                                  WHERE status = "已完成"
-                                  GROUP BY merchant_id''').fetchall()
-    
-    for merchant in merchants:
-        cursor.execute('''INSERT INTO transactions (user_id, amount, transaction_type) 
-                          VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '應收'))
-        cursor.execute('''INSERT INTO reports (user_id, total_received, report_type) 
-                          VALUES (?, ?, ?)''', (merchant['merchant_id'], merchant['total_received'], '商家'))
-    
-    # 計算外送員接單數
-    delivery_persons = cursor.execute('''SELECT delivery_person_id, COUNT(*) as total_orders
-                                         FROM orders
-                                         WHERE delivery_person_id IS NOT NULL
-                                         GROUP BY delivery_person_id''').fetchall()
-    
-    for person in delivery_persons:
-        cursor.execute('''INSERT INTO reports (user_id, total_orders, report_type) 
-                          VALUES (?, ?, ?)''', (person['delivery_person_id'], person['total_orders'], '外送員'))
-    
-    # 計算客戶應付金額
-    customers = cursor.execute('''SELECT customer_id, SUM(price) as total_due
-                                  FROM orders
-                                  WHERE status = "已完成"
-                                  GROUP BY customer_id''').fetchall()
-    
-    for customer in customers:
-        cursor.execute('''INSERT INTO reports (user_id, total_due, report_type) 
-                          VALUES (?, ?, ?)''', (customer['customer_id'], customer['total_due'], '客戶'))
-    
-    conn.commit()
-    conn.close()
-    flash('結算完成', 'success')
-    return redirect(url_for('dashboard'))
-
-@app.route('/reports/<string:report_type>', methods=['GET'])
-def view_reports(report_type):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    reports = conn.execute('''SELECT users.username, reports.total_received, reports.total_orders, reports.total_due
-                              FROM reports
-                              JOIN users ON reports.user_id = users.id
-                              WHERE reports.report_type = ?''', (report_type,)).fetchall()
-    conn.close()
-
-    merchant_settlements = []
-    delivery_settlements = []
-    customer_settlements = []
-
-    for report in reports:
-        if report_type == '商家':
-            merchant_settlements.append({'merchant_name': report['username'], 'amount': report['total_received']})
-        elif report_type == '外送員':
-            delivery_settlements.append({'delivery_name': report['username'], 'order_count': report['total_orders']})
-        elif report_type == '客戶':
-            customer_settlements.append({'customer_name': report['username'], 'amount': report['total_due']})
-
-    return render_template('reports.html', 
-                           merchant_settlements=merchant_settlements,
-                           delivery_settlements=delivery_settlements,
-                           customer_settlements=customer_settlements,
-                           report_type=report_type)
-
 
 
 """import sqlite3  #刪除資料庫資料
