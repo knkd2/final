@@ -16,6 +16,17 @@
             });
             document.getElementById('total-price').textContent = `總金額: $${total.toFixed(2)}`;
         }
+
+        function deleteOrder(orderId) {
+            fetch(`/delete_order/${orderId}`, {
+                method: 'POST',
+            }).then(response => {
+                if (response.ok) {
+                    document.getElementById(`order-${orderId}`).remove();  // 移除該訂單
+                    calculateTotal();  // 更新總金額
+                }
+            });
+        }
     </script>
 </head>
 <body>
@@ -35,7 +46,7 @@
             <ul class="order-list">
                 {% if orders %}
                     {% for order in orders %}
-                        <li class="order-item">
+                        <li id="order-{{ order.id }}" class="order-item">
                             <input type="checkbox" name="order_ids" value="{{ order.id }}" 
                                 {% if order.status == '已確認' %} disabled {% endif %} 
                                 onclick="calculateTotal()">
@@ -50,10 +61,9 @@
                                     未下單
                                 {% endif %}
                             </span>
+
                             {% if order.status != '已確認' %}
-                                <form action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" class="inline-form">
-                                    <button type="submit" class="btn btn-danger">刪除</button>
-                                </form>
+                                <button type="button" class="btn btn-danger" onclick="deleteOrder({{ order.id }})">刪除</button>
                             {% endif %}
                         </li>
                     {% endfor %}
