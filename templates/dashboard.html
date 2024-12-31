@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主頁</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>歡迎，{{ session['username'] }}</h1>
+        {% if session['role'] == 'merchant' %}
+            <p>您是商家，這裡可以管理菜單、查看訂單等。</p>
+            <a href="{{ url_for('menu') }}">管理菜單</a><br>
+            <a href="{{ url_for('orders') }}">查看訂單</a>
+        {% elif session['role'] == 'delivery_person' %}
+            <p>您是配送員，這裡可以查看待配送的訂單。</p>
+            <a href="{{ url_for('delivery') }}">查看配送訂單</a>
+        {% else %}
+            <p>您是顧客，這裡可以查看菜單並訂購外賣。</p>
+            <a href="{{ url_for('menu') }}">查看菜單</a><br>
+            <a href="{{ url_for('orders') }}">查看我的訂單</a>
+        {% endif %}
+        <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit">登出</button>
+        </form>
+    </div>
+</body>
+</html>

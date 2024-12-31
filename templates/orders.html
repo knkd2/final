@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的订单</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h1>📦 我的订单</h1>
+        <div>
+            <p>欢迎，{{ session['username'] }}！</p>
+            <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                <button class="btn btn-secondary">登出</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2>您的订单列表</h2>
+        <ul class="order-list">
+            {% if orders %}
+                {% for order in orders %}
+                    <li class="order-item">
+                        <span>订单 #{{ order.id }}:</span>
+                        <span>{{ order.item_name }}</span> - 
+                        <span class="order-price">金额: ¥{{ order.price }}</span> - 
+                        <span class="order-status">状态: {{ order.status }}</span>
+                    </li>
+                {% endfor %}
+                <li class="order-total">
+                    <strong>总金额: ¥{{ total_price }}</strong>
+                </li>
+                <form action="{{ url_for('orders') }}" method="POST">
+                    <button class="btn btn-primary">确认下单</button>
+                </form>
+            {% else %}
+                <li class="empty-orders">您没有任何订单。</li>
+            {% endif %}
+        </ul>
+
+        <!-- 返回键 -->
+        <div class="back-button">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">返回菜品列表</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2024 菜品菜单系统. 美味每一天！</p>
+    </footer>
+</body>
+</html>

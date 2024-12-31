@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h1>📦 菜品菜单</h1>
+        <div>
+            {% if session.get('user_id') %}
+                <p>欢迎，{{ session['username'] }}！</p>
+                <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                    <button class="btn btn-secondary">登出</button>
+                </form>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-primary">登录</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container">
+        <h3>菜品列表</h3>
+        <ul class="menu-list">
+            {% for item in menu_items %}
+                <li class="menu-item">
+                    <span>{{ item.item_name }}</span>
+                    <span>{{ item.price }} 元</span>
+                    {% if session.get('user_id') and session['role'] == 'customer' %}
+                        <form action="{{ url_for('place_order', item_id=item.id) }}" method="POST">
+                            <button class="btn btn-primary">下单</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    </main>
+
+    <footer>
+        <p>© 2024 菜品菜单系统. 美味每一天！</p>
+    </footer>
+</body>
+</html>

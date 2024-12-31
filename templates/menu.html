@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商家菜单管理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <h1>🍽️ 管理您的菜单</h1>
+        <div>
+            <p>欢迎，{{ session['username'] }}！</p>
+            <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                <button class="btn btn-secondary">登出</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2>🌟 当前订单列表</h2>
+        <ul class="order-list">
+            {% if orders %}
+                {% for order in orders %}
+                    <li class="order-item">
+                        <span>订单 #{{ order.id }}: {{ order.item_name }}</span> - 
+                        <span>金额: ¥{{ order.price }}</span> - 
+                        <span class="order-status">状态: {{ order.status }}</span>
+                        <form action="{{ url_for('update_order_status', order_id=order.id) }}" method="POST" class="inline-form">
+                            <button class="btn btn-primary">确认订单</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li class="empty-orders">没有任何待处理订单。</li>
+            {% endif %}
+        </ul>
+
+        <h3>📋 添加新菜品</h3>
+        <form method="POST" class="add-item-form">
+            <label for="item_name">菜品名称:</label>
+            <input type="text" id="item_name" name="item_name" required>
+
+            <label for="description">菜品描述:</label>
+            <textarea id="description" name="description" required></textarea>
+
+            <label for="price">价格:</label>
+            <input type="number" id="price" name="price" step="0.01" required>
+
+            <button type="submit" class="btn btn-primary">添加菜品</button>
+        </form>
+    </main>
+
+    <footer>
+        <p>© 2024 菜品菜单管理系统. 管理您的美味菜单！</p>
+    </footer>
+</body>
+</html>

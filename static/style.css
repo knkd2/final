@@ -1,0 +1,115 @@
+/* 全局样式 */
+body {
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #fff7e6; /* 柔和的米黄色背景 */
+    color: #4d2600; /* 温暖的深棕色文字 */
+}
+
+/* 标题 */
+h1, h2 {
+    color: #ff6600; /* 活泼的橙色 */
+}
+
+/* 顶部导航栏 */
+.navbar {
+    background-color: #ffcc99; /* 明亮的奶油橙色 */
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #ff9933;
+}
+
+.navbar .btn {
+    text-decoration: none;
+    color: #fff;
+    background-color: #ff6600;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.navbar .btn-secondary {
+    background-color: #666; /* 次要按钮样式 */
+}
+
+.navbar .btn:hover {
+    background-color: #e65c00; /* 按钮的悬停效果 */
+}
+
+/* 菜单 */
+.container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.menu-item {
+    display: flex;
+    justify-content: space-between;
+    background: #ffe6cc;
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+}
+
+.menu-name {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.menu-price {
+    color: #006600; /* 绿色，显示价格 */
+    font-weight: bold;
+}
+
+/* 订单 */
+.orders {
+    margin-top: 30px;
+}
+
+.order-item {
+    padding: 10px 15px;
+    background-color: #e6ffe6; /* 柔和的绿色 */
+    margin-bottom: 10px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.order-status {
+    font-style: italic;
+    color: #003300;
+}
+
+.empty-orders {
+    text-align: center;
+    font-style: italic;
+    color: #999;
+}
+
+/* 底部 */
+footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #ffcc99;
+    color: #4d2600;
+    border-top: 3px solid #ff9933;
+    position: relative;
+    bottom: 0;
+    width: 100%;
+}
