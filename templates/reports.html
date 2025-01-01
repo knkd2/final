@@ -28,9 +28,9 @@
                 {% for report in merchant_reports %}
                     <li class="settlement-item">
                         <span>商家: {{ report.merchant_name }}</span> - 
-                        <span>應收金額: ${{ report.total_received }}</span>
+                        <span>應收金額: ${{ report.total_received  }}</span>
                     </li>
-                    {% set total_merchant_amount = total_merchant_amount + (report.total_received * 0.8) %}
+                    {% set total_merchant_amount = total_merchant_amount + (report.total_received ) %}
                 {% endfor %}
                 <li class="settlement-item"><strong>總應收金額: ${{ total_merchant_amount }}</strong></li>
             {% else %}
@@ -39,14 +39,14 @@
         </ul>
 
         <!-- 外送員結算 -->
-        <h2>🚴 各小哥接單數與應收金額</h2>
+        <h2>🚴 各小哥接單數</h2>
         <ul class="settlement-list">
             {% if delivery_reports %}
                 {% for report in delivery_reports %}
                     <li class="settlement-item">
                         <span>外送員: {{ report.delivery_name }}</span> - 
                         <span>接單數: {{ report.total_orders }}</span> - 
-                        <span>應收金額: ${{ report.total_received * 0.2 }}</span>
+                        
                     </li>
                 {% endfor %}
             {% else %}
