@@ -25,14 +25,17 @@
         <ul class="settlement-list">
             {% if merchant_reports %}
                 {% set total_merchant_amount = 0 %}
+                {% set total_actual_received = 0 %}
                 {% for report in merchant_reports %}
                     <li class="settlement-item">
                         <span>商家: {{ report.merchant_name }}</span> - 
-                        <span>應收金額: ${{ report.total_received }}</span>
+                        <span>應收金額: ${{ report.total_received }}</span> - 
+                        <span>實際收入: ${{ report.total_received * 0.8 }}</span>
                     </li>
-                    {% set total_merchant_amount = total_merchant_amount + (report.total_received * 0.8) %}
+                    {% set total_merchant_amount = total_merchant_amount + report.total_received %}
+                    {% set total_actual_received = total_actual_received + (report.total_received * 0.8) %}
                 {% endfor %}
-                <li class="settlement-item"><strong>總應收金額: ${{ total_merchant_amount }}</strong></li>
+               
             {% else %}
                 <li class="empty-settlements">沒有商家應收金額。</li>
             {% endif %}
@@ -46,7 +49,8 @@
                     <li class="settlement-item">
                         <span>外送員: {{ report.delivery_name }}</span> - 
                         <span>接單數: {{ report.total_orders }}</span> - 
-                        <span>應收金額: ${{ report.total_received * 0.2 }}</span>
+                        <span>收入金額: ${{ report.total_received }}</span> - 
+                      
                     </li>
                 {% endfor %}
             {% else %}
@@ -58,12 +62,15 @@
         <h2>💳 各客戶應付金額</h2>
         <ul class="settlement-list">
             {% if customer_reports %}
+                {% set total_customer_due = 0 %}
                 {% for report in customer_reports %}
                     <li class="settlement-item">
                         <span>客戶: {{ report.customer_name }}</span> - 
                         <span>應付金額: ${{ report.total_due }}</span>
                     </li>
+                    {% set total_customer_due = total_customer_due + report.total_due %}
                 {% endfor %}
+               
             {% else %}
                 <li class="empty-settlements">沒有客戶應付金額。</li>
             {% endif %}

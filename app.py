@@ -105,6 +105,7 @@ def init_db():
                     total_received REAL DEFAULT 0,
                     total_orders INTEGER DEFAULT 0,
                     total_due REAL DEFAULT 0,
+                    UNIQUE(user_id, report_type),
                     FOREIGN KEY (user_id) REFERENCES users(id))''')
     
     conn.execute('''CREATE TABLE IF NOT EXISTS reviews (
@@ -222,22 +223,26 @@ def menu():
 
     # 獲取商家的菜品列表
     menu_items = conn.execute('SELECT * FROM menu WHERE merchant_id = ?', (session['user_id'],)).fetchall()
+    
     # 獲取商家的訂單列表，包含所有可能的訂單狀態
     merchant_orders = conn.execute('''
         SELECT mo.*, 
-               CASE WHEN do.status = '已接單' THEN '已接單'
-                    WHEN do.status = '已接單' THEN '已接單'
-                    WHEN do.status = '已送達' THEN '已送達'
-                    WHEN do.status = '取貨中' THEN '取貨中'
-                    WHEN mo.status = '已完成' THEN '已完成'
-                    ELSE '未接單' END AS delivery_status
+               CASE 
+                   WHEN do.status = '已接單' THEN '已接單'
+                   WHEN do.status = '已送達' THEN '已送達'
+                   WHEN do.status = '取貨中' THEN '取貨中'
+                   WHEN mo.status = '已完成' THEN '已完成'
+                   ELSE '未接單' 
+               END AS delivery_status
         FROM merchant_orders mo
         LEFT JOIN delivery_orders do ON mo.id = do.merchant_order_id
         WHERE mo.merchant_id = ?
     ''', (session['user_id'],)).fetchall()
+    
     conn.close()
 
     return render_template('menu.html', menu_items=menu_items, merchant_orders=merchant_orders)
+
 
     
 # 删除菜品
@@ -655,20 +660,22 @@ def confirm_receipt(order_id):
     try:
         # 更新訂單狀態為已完成
         cursor.execute('UPDATE orders SET status = "已完成" WHERE id = ?', (order_id,))
-        cursor.execute('UPDATE merchant_orders SET status="已完成" WHERE id =?',(order_id,))
         
         # 確認外送訂單存在並更新狀態為已送達
-        delivery_order = cursor.execute('SELECT * FROM delivery_orders WHERE merchant_order_id = ?', (order_id,)).fetchone()
+        order = cursor.execute('SELECT * FROM orders WHERE id = ?', (order_id,)).fetchone()
+        delivery_order_id = order['delivery_person_id']  # 假設此欄位包含 delivery_order_id
+        delivery_order = cursor.execute('SELECT * FROM delivery_orders WHERE id = ?', (delivery_order_id,)).fetchone()
         if delivery_order:
-            cursor.execute('UPDATE delivery_orders SET status = "已完成" WHERE merchant_order_id = ?', (order_id,))
+            print(f"Delivery order found: {delivery_order}")
+            cursor.execute('UPDATE delivery_orders SET status = "已完成" WHERE id = ?', (order_id,))
         else:
-            print(f"No delivery order found with merchant_order_id {order_id}")
+            print(f"No delivery order found with id {delivery_order_id}")
             flash('未找到外送訂單。', 'danger')
 
-        # 獲取訂單詳細信息
-        order = cursor.execute('SELECT * FROM orders WHERE id = ?', (order_id,)).fetchone()
-        
-        # 計算商家和外送員的收入
+        # 更新商家訂單狀態為已完成
+        cursor.execute('UPDATE merchant_orders SET status = "已完成" WHERE order_id = ?', (order_id,))
+
+        # 更新報告資料
         merchant_income = order['price'] * 0.8
         delivery_person_income = order['price'] * 0.2
 
@@ -687,15 +694,15 @@ def confirm_receipt(order_id):
             total_received = total_received + excluded.total_received
         ''', (order['merchant_id'], merchant_income))
 
-        # 確保 delivery_person_id 存在並更新外送員報告
-        if delivery_order and delivery_order['delivery_person_id']:
+        # 更新外送員報告
+        if order['delivery_person_id']:
             cursor.execute('''
                 INSERT INTO reports (user_id, report_type, total_orders, total_received)
                 VALUES (?, '外送員', 1, ?)
                 ON CONFLICT(user_id, report_type) DO UPDATE SET
                 total_orders = total_orders + 1,
                 total_received = total_received + excluded.total_received
-            ''', (delivery_order['delivery_person_id'], delivery_person_income))
+            ''', (order['delivery_person_id'], delivery_person_income))
 
         # 更新客戶報告
         cursor.execute('''
@@ -717,6 +724,12 @@ def confirm_receipt(order_id):
         conn.close()
 
     return redirect(url_for('orders'))
+
+
+
+
+
+
 
 
 
@@ -899,6 +912,7 @@ def view_reports():
 
 
 
+
 """
 import sqlite3
 
@@ -907,20 +921,18 @@ conn = sqlite3.connect('new_delivery.db')  # 請將 'your_database_file.db' 替�
 cursor = conn.cursor()
 
 # 刪除現有的 merchant_orders 資料表（如果存在）
-cursor.execute("DROP TABLE IF EXISTS reviews")
+cursor.execute("DROP TABLE IF EXISTS reports")
 
 # 重新創建 merchant_orders 資料表
-cursor.execute('''CREATE TABLE IF NOT EXISTS reviews (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        reviewed_user_id INTEGER NOT NULL,
-                        order_id INTEGER NOT NULL,
-                        rating INTEGER NOT NULL,
-                        comment TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (id),
-                        FOREIGN KEY (reviewed_user_id) REFERENCES users (id),
-                        FOREIGN KEY (order_id) REFERENCES orders (id))''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    report_type TEXT NOT NULL,
+                    total_received REAL DEFAULT 0,
+                    total_orders INTEGER DEFAULT 0,
+                    total_due REAL DEFAULT 0,
+                    UNIQUE(user_id, report_type),
+                    FOREIGN KEY (user_id) REFERENCES users(id))''')
 
 # 提交更改
 conn.commit()
@@ -928,8 +940,7 @@ conn.commit()
 # 關閉資料庫連接
 conn.close()
 
-print("merchant_orders 資料表已刪除並重新建立")
-"""
+print("merchant_orders 資料表已刪除並重新建立")"""
 
 
 if __name__ == '__main__':

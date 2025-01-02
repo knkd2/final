@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录</title>
+    <title>登入</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header class="navbar">
-        <h1>🚪 登录</h1>
+        <h1>🚪 登入</h1>
         <div>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">返回首页</a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">返回首頁</a>
         </div>
     </header>
 
     <main class="container">
-        <h2>请登录您的账号</h2>
+        <h2>請登入您的帳號</h2>
 
         <form method="POST" class="login-form">
-            <label for="username">用户名:</label>
+            <label for="username">帳號:</label>
             <input type="text" id="username" name="username" required>
 
-            <label for="password">密码:</label>
+            <label for="password">密碼:</label>
             <input type="password" id="password" name="password" required>
 
-            <button type="submit" class="btn btn-primary">登录</button>
+            <button type="submit" class="btn btn-primary">登入</button>
         </form>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -39,7 +39,7 @@
     </main>
 
     <footer>
-        <p>© 2024 菜品菜单系统. 美味每一天！</p>
+        <p>© 2024 菜品菜單系统. 美味每一天！</p>
     </footer>
 </body>
 </html>
