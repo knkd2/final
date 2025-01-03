@@ -66,6 +66,9 @@
         <div>
             <p>歡迎，{{ session['username'] }}！</p>
             <form action="{{ url_for('logout') }}" method="POST" class="inline-form">
+                <button class="report-btn" onclick="reportIssue()">
+                    檢舉
+                </button>
                 <button class="btn btn-secondary">登出</button>
             </form>
         </div>
@@ -201,6 +204,48 @@
             text-decoration: none;
             cursor: pointer;
         }
+
+
+                /* 按鈕樣式 */
+        .report-btn {
+            background-color: #e74c3c; /* 深紅色 */
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease; /* 動畫效果 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* 陰影效果 */
+        }
+
+        /* 按鈕懸停效果 */
+        .report-btn:hover {
+            background-color: #c0392b; /* 濃紅色 */
+            transform: scale(1.05); /* 按鈕稍微放大 */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* 增強陰影 */
+        }
+
+        /* 按鈕點擊效果 */
+        .report-btn:active {
+            background-color: #e74c3c;
+            transform: scale(0.98); /* 按鈕被按下時縮小 */
+        }
+
+    
     </style>
+
+
+<script>
+    function reportIssue() {
+        // 模擬檢舉錯誤，這可以根據實際情況來觸發
+        const errorMessage = "親愛的顧客您好，本店不允許檢舉，再犯就幫您註銷帳號，愛你喔";
+        
+        // 彈出錯誤提示框
+        alert(errorMessage);
+
+    }
+</script>
 </body>
 </html>
